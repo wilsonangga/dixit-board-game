@@ -69,10 +69,13 @@ function createRoom(name) {
   });
 }
 
+/* On successful join via invite link, clean the URL so refreshes behave normally */
 function joinRoom(code, name) {
   socket.emit('joinRoom', { code, name }, (res) => {
-    if (res.ok) saveSession(res.roomCode, res.playerId);
-    else toast(res.error);
+    if (res.ok) {
+      saveSession(res.roomCode, res.playerId);
+      if (location.search) history.replaceState(null, '', location.pathname);
+    } else toast(res.error);
   });
 }
 
@@ -116,7 +119,13 @@ function playersBar() {
 
 function headerHTML(subtitle) {
   return `<header class="game-header">
-    <div class="logo-small">🐇 Dixit Online</div>
+    <div class="header-top">
+      <div class="logo-small">🐇 Dixit Online</div>
+      <div class="header-actions">
+        ${state.you.isHost ? '<button id="endGameBtn" class="btn ghost small danger">End game</button>' : ''}
+        <button id="leaveBtn" class="btn ghost small">Exit</button>
+      </div>
+    </div>
     <div class="room-info">Room <button class="room-code" id="copyCode" title="Copy invite code">${esc(state.code)}</button>
       · Round ${state.round} · Deck ${state.deckCount}</div>
     <div class="subtitle">${subtitle}</div>
@@ -138,6 +147,7 @@ function handHTML(selectable, maxSelect) {
 }
 
 function renderHome() {
+  const inviteCode = (new URLSearchParams(location.search).get('room') || '').trim().toUpperCase();
   $app.innerHTML = `
     <div class="home">
       <div class="hero">
@@ -145,13 +155,20 @@ function renderHome() {
         <p>A game of imagination, clues and beautiful cards.<br/>Create a room, share the code, play with 3–6 friends.</p>
       </div>
       <div class="home-card">
+        ${inviteCode ? `<div class="invite-banner">🎉 You've been invited to room <b>${esc(inviteCode)}</b></div>` : ''}
         <label>Your name</label>
         <input id="nameInput" maxlength="20" placeholder="e.g. Luna" autocomplete="off" />
+        ${inviteCode ? `
+        <input id="codeInput" type="hidden" value="${esc(inviteCode)}" />
+        <button id="joinBtn" class="btn primary">Join room ${esc(inviteCode)}</button>
+        <button id="clearInviteBtn" class="btn ghost">Not your room? Start over</button>
+        ` : `
         <button id="createBtn" class="btn primary">Create a room</button>
         <div class="divider"><span>or join a friend</span></div>
         <label>Room code</label>
         <input id="codeInput" maxlength="5" placeholder="ABCDE" autocomplete="off" style="text-transform:uppercase" />
         <button id="joinBtn" class="btn secondary">Join room</button>
+        `}
       </div>
       <div class="rules-hint">
         <h3>How to play</h3>
@@ -174,17 +191,30 @@ function renderHome() {
     localStorage.setItem('dixitName', n);
     return n;
   };
-  document.getElementById('createBtn').onclick = () => {
-    const n = getName(); if (n) createRoom(n);
-  };
+  const createBtn = document.getElementById('createBtn');
+  if (createBtn) {
+    createBtn.onclick = () => {
+      const n = getName(); if (n) createRoom(n);
+    };
+  }
   document.getElementById('joinBtn').onclick = () => {
     const n = getName(); if (!n) return;
     const code = codeInput.value.trim().toUpperCase();
     if (code.length !== 5) { toast('Room codes are 5 characters'); codeInput.focus(); return; }
     joinRoom(code, n);
   };
+  const clearInviteBtn = document.getElementById('clearInviteBtn');
+  if (clearInviteBtn) {
+    clearInviteBtn.onclick = () => {
+      history.replaceState(null, '', location.pathname);
+      render();
+    };
+  }
   codeInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') document.getElementById('joinBtn').click(); });
-  nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') document.getElementById('createBtn').click(); });
+  nameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') (inviteCode ? document.getElementById('joinBtn') : createBtn).click();
+  });
+  if (inviteCode) nameInput.focus();
 }
 
 function renderLobby() {
@@ -422,7 +452,22 @@ function bindCommon() {
     };
   }
   const leave = document.getElementById('leaveBtn');
-  if (leave) leave.onclick = leaveRoom;
+  if (leave) {
+    leave.onclick = () => {
+      const inGame = state && !['lobby', 'gameover'].includes(state.phase);
+      if (!inGame || confirm('Exit the game? Your cards will be removed from this round.')) {
+        leaveRoom();
+      }
+    };
+  }
+  const end = document.getElementById('endGameBtn');
+  if (end) {
+    end.onclick = () => {
+      if (confirm('End the game for everyone? Final scores will decide the winner.')) {
+        socket.emit('endGame');
+      }
+    };
+  }
 }
 
 function render() {
@@ -438,16 +483,6 @@ function render() {
   }
 }
 
-/* Support invite links: ?room=CODE prefills the join box */
 window.addEventListener('DOMContentLoaded', () => {
   render();
-  const params = new URLSearchParams(location.search);
-  const room = params.get('room');
-  if (room && !loadSession()) {
-    const codeInput = document.getElementById('codeInput');
-    if (codeInput) {
-      codeInput.value = room.toUpperCase();
-      document.getElementById('nameInput')?.focus();
-    }
-  }
 });

@@ -73,4 +73,56 @@ for (const n of [3, 4, 5, 6]) playGame(n);
   assert(room.players.filter((p) => p.id !== st.id).every((p) => p.lastDelta >= 2), 'others +2');
   console.log('OK all-found scoring');
 }
+
+// leave & end-game features
+{
+  const mgr = new RoomManager();
+  const room = mgr.create();
+  const ps = [];
+  for (let i = 0; i < 5; i++) ps.push(room.addPlayer('R' + i, 's' + i));
+  room.start(ps[0].id);
+  const st = room.storyteller;
+  room.giveClue(st.id, st.hand[0], 'clue');
+
+  // a non-storyteller submits, then exits mid-round
+  const leaver = room.players.find((p) => p.id !== st.id);
+  room.submitCards(leaver.id, [leaver.hand[0]]);
+  room.leave(leaver.id);
+  assert(room.players.length === 4, 'leaver removed');
+  assert(!room.players.some((p) => p.id === leaver.id), 'leaver gone');
+
+  // remaining players submit -> vote phase without leaver's card
+  for (const p of room.players) {
+    if (p.id !== st.id && !p.submitted.length) room.submitCards(p.id, [p.hand[0]]);
+  }
+  assert(room.phase === 'vote', 'vote phase after leave');
+  assert(room.tableCards.every((t) => t.ownerId !== leaver.id), 'leaver cards off table');
+
+  // storyteller exits mid-vote -> round aborted, cards returned
+  const stId = st.id;
+  room.leave(stId);
+  assert(room.phase === 'clue', 'round restarted after storyteller left');
+  assert(room.storyteller && room.storyteller.id !== stId, 'new storyteller assigned');
+  assert(room.players.every((p) => p.submitted.length === 0), 'submissions reset');
+
+  // host ends the game early
+  let threw = false;
+  try { room.hostEndGame(room.players.find((p) => p.id !== room.hostId).id); } catch { threw = true; }
+  assert(threw, 'non-host cannot end game');
+  room.hostEndGame(room.hostId);
+  assert(room.phase === 'gameover', 'host ended game');
+  console.log('OK leave & end-game');
+}
+
+// leaving below min players ends the game
+{
+  const mgr = new RoomManager();
+  const room = mgr.create();
+  const ps = [];
+  for (let i = 0; i < 3; i++) ps.push(room.addPlayer('S' + i, 's' + i));
+  room.start(ps[0].id);
+  room.leave(room.players.find((p) => p.id !== room.storyteller.id).id);
+  assert(room.phase === 'gameover', 'game ends when players drop below minimum');
+  console.log('OK min-players end');
+}
 console.log('All simulations passed.');

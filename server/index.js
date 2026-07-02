@@ -96,12 +96,13 @@ io.on('connection', (socket) => {
   socket.on('vote', ({ cardId }) => withRoom(socket, (room, pid) => room.vote(pid, Number(cardId))));
   socket.on('nextRound', () => withRoom(socket, (room, pid) => room.nextRound(pid)));
   socket.on('playAgain', () => withRoom(socket, (room, pid) => room.playAgain(pid)));
+  socket.on('endGame', () => withRoom(socket, (room, pid) => room.hostEndGame(pid)));
 
   socket.on('leaveRoom', () => {
     const { roomCode, playerId } = socket.data;
     const room = manager.get(roomCode);
     if (room && playerId) {
-      room.removePlayer(playerId);
+      room.leave(playerId);
       socket.data.roomCode = null;
       socket.data.playerId = null;
       if (room.players.length === 0) manager.delete(room.code);

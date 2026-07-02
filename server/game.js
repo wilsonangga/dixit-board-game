@@ -100,6 +100,55 @@ class Room {
     }
   }
 
+  /** Player intentionally exits the room (any phase). */
+  leave(playerId) {
+    const p = this.findPlayer(playerId);
+    if (!p) return;
+    if (this.phase === PHASES.LOBBY || this.phase === PHASES.GAMEOVER) {
+      this.removePlayer(playerId);
+      return;
+    }
+    const idx = this.players.indexOf(p);
+    const wasStoryteller = this.storyteller?.id === playerId;
+    this.removePlayer(playerId);
+    if (this.players.length < MIN_PLAYERS) {
+      this.endGame();
+      return;
+    }
+    if (this.phase === PHASES.REVEAL) return; // round already scored
+    if (wasStoryteller) {
+      // Abort the round: everyone takes their played cards back, next player tells the story.
+      for (const q of this.players) {
+        q.hand.push(...q.submitted);
+        q.submitted = [];
+        q.vote = null;
+      }
+      this.storytellerIndex = idx % this.players.length;
+      this.round--; // beginRound() re-increments
+      this.beginRound();
+    } else {
+      // Pull their cards off the table and void any votes cast on them.
+      const gone = new Set(this.tableCards.filter((t) => t.ownerId === playerId).map((t) => t.cardId));
+      if (gone.size) {
+        this.tableCards = this.tableCards.filter((t) => !gone.has(t.cardId));
+        for (const q of this.players) {
+          if (q.vote !== null && gone.has(q.vote)) q.vote = null;
+        }
+      }
+      this.checkSubmissionsComplete();
+      this.checkVotesComplete();
+    }
+  }
+
+  /** Host ends the game early — final scores decide the winner. */
+  hostEndGame(playerId) {
+    if (playerId !== this.hostId) throw new Error('Only the host can end the game');
+    if (this.phase === PHASES.LOBBY || this.phase === PHASES.GAMEOVER) {
+      throw new Error('No game in progress');
+    }
+    this.endGame();
+  }
+
   markDisconnected(playerId) {
     const p = this.findPlayer(playerId);
     if (!p) return;
