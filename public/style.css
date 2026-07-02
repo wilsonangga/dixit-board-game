@@ -202,11 +202,11 @@ label { display: block; font-size: 0.85rem; color: var(--muted); margin: 14px 0 
 /* ---------- cards ---------- */
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 16px;
   margin-top: 12px;
 }
-.card-grid.table { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+.card-grid.table { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 
 .card {
   position: relative;
@@ -288,6 +288,7 @@ label { display: block; font-size: 0.85rem; color: var(--muted); margin: 14px 0 
 .score-bar div { height: 100%; background: linear-gradient(90deg, var(--accent2), var(--accent)); border-radius: 999px; transition: width 0.6s; }
 .total { font-weight: 800; text-align: right; }
 .win-hint { text-align: center; color: var(--muted); font-size: 0.75rem; margin-top: 10px; }
+.countdown { font-variant-numeric: tabular-nums; opacity: 0.85; }
 
 /* ---------- game over ---------- */
 .gameover { max-width: 480px; margin: 50px auto; text-align: center; }
@@ -305,8 +306,8 @@ label { display: block; font-size: 0.85rem; color: var(--muted); margin: 14px 0 
 
 /* ---------- responsive ---------- */
 @media (max-width: 560px) {
-  .card-grid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; }
-  .card-grid.table { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+  .card-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+  .card-grid.table { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
   .hero h1 { font-size: 2.2rem; }
   .clue-form { flex-direction: column; }
   .score-row { grid-template-columns: 1fr 40px 1.2fr 36px; }

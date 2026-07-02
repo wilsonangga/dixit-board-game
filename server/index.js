@@ -19,10 +19,39 @@ app.get('/healthz', (_req, res) => res.send('ok'));
 const manager = new RoomManager();
 setInterval(() => manager.cleanup(), 60_000).unref();
 
+const REVEAL_AUTO_MS = 5000;
+const revealTimers = new Map(); // roomCode -> timeout
+
+function scheduleAutoAdvance(room) {
+  const existing = revealTimers.get(room.code);
+  if (room.phase === 'reveal') {
+    if (existing) return;
+    room.revealDeadline = Date.now() + REVEAL_AUTO_MS;
+    const t = setTimeout(() => {
+      revealTimers.delete(room.code);
+      // Only act if this room still exists and is still revealing
+      if (manager.get(room.code) === room && room.phase === 'reveal') {
+        try {
+          room.nextRound(room.hostId);
+        } catch { /* ignore */ }
+        broadcast(room);
+      }
+    }, REVEAL_AUTO_MS);
+    revealTimers.set(room.code, t);
+  } else {
+    room.revealDeadline = null;
+    if (existing) {
+      clearTimeout(existing);
+      revealTimers.delete(room.code);
+    }
+  }
+}
+
 // Track which room/player each socket belongs to
 // socket.data = { roomCode, playerId }
 
 function broadcast(room) {
+  scheduleAutoAdvance(room);
   for (const p of room.players) {
     if (p.connected && p.socketId) {
       io.to(p.socketId).emit('state', room.stateFor(p.id));

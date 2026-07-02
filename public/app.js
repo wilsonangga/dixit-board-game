@@ -5,6 +5,7 @@ const socket = io();
 let state = null; // latest server state
 let selectedCards = []; // local selection (hand or table)
 let clueDraft = '';
+let countdownTimer = null;
 
 const $app = document.getElementById('app');
 const $toast = document.getElementById('toast');
@@ -389,10 +390,19 @@ function renderReveal() {
     </section>
     <div class="center">
       ${canContinue
-        ? '<button id="nextBtn" class="btn primary big">Next round →</button>'
-        : '<p class="waiting-pulse">Waiting for the next round…</p>'}
+        ? `<button id="nextBtn" class="btn primary big">Next round → <span id="countdown" class="countdown"></span></button>`
+        : '<p class="waiting-pulse">Next round in <span id="countdown" class="countdown"></span>…</p>'}
     </div>`;
   if (canContinue) document.getElementById('nextBtn').onclick = () => socket.emit('nextRound');
+  if (state.revealDeadline) {
+    const el = document.getElementById('countdown');
+    const tick = () => {
+      const s = Math.max(0, Math.ceil((state.revealDeadline - Date.now()) / 1000));
+      if (el) el.textContent = `(${s})`;
+    };
+    tick();
+    countdownTimer = setInterval(tick, 250);
+  }
   bindCommon();
 }
 
@@ -471,6 +481,8 @@ function bindCommon() {
 }
 
 function render() {
+  clearInterval(countdownTimer);
+  countdownTimer = null;
   if (!state || !state.you) return renderHome();
   switch (state.phase) {
     case 'lobby': return renderLobby();

@@ -383,6 +383,7 @@ class Room {
       hostId: this.hostId,
       storytellerId: st ? st.id : null,
       winnerIds: this.winnerIds,
+      revealDeadline: this.phase === PHASES.REVEAL ? this.revealDeadline || null : null,
       players: this.players.map((p) => ({
         id: p.id,
         name: p.name,
